@@ -7,8 +7,18 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Local Whiteboard - Milestone 1</h1>
-  <canvas id="board"></canvas>
+  <h1>Collaborative Whiteboard - Milestone 3</h1>
+  <div id="board-container">
+    <canvas id="board"></canvas>
+    <div id="sticky-container"></div>
+  </div>
+  <div id="chat">
+    <div id="chat-messages"></div>
+    <input id="chat-input" placeholder="Type a message..." />
+  </div>
+  <button id="add-sticky">Add Sticky Note</button>
+
+  <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
