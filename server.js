@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
+const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 const server = http.createServer(app);
@@ -9,14 +10,59 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Serve static files (your HTML, CSS, JS)
+// Serve static files like index.html, script.js, etc.
 app.use(express.static(path.join(__dirname, ".")));
 
+// Redirect root URL / to a new unique board URL
+app.get("/", (req, res) => {
+  res.redirect(`/board/${uuidv4()}`);
+});
+
+// Serve index.html for any board session URL like /board/:sessionId
+app.get("/board/:sessionId", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+// 404 handler for any other routes
+app.use((req, res) => {
+  res.status(404).sendFile(path.join(__dirname, "404.html"));
+});
+
+// WebSocket logic for real-time collaboration
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
+  let currentSession = null;
+
+  // Join a specific room based on session ID
+  socket.on("join-session", (sessionId) => {
+    socket.join(sessionId);
+    currentSession = sessionId;
+    console.log(`Socket ${socket.id} joined session ${sessionId}`);
+  });
+
   socket.on("draw", (data) => {
-    socket.broadcast.emit("draw", data);
+    if (currentSession) {
+      socket.to(currentSession).emit("draw", data);
+    }
+  });
+
+  socket.on("add-sticky", (data) => {
+    if (currentSession) {
+      socket.to(currentSession).emit("add-sticky", data);
+    }
+  });
+
+  socket.on("move-sticky", (data) => {
+    if (currentSession) {
+      socket.to(currentSession).emit("move-sticky", data);
+    }
+  });
+
+  socket.on("chat-message", (msg) => {
+    if (currentSession) {
+      socket.to(currentSession).emit("chat-message", msg);
+    }
   });
 
   socket.on("disconnect", () => {
@@ -27,61 +73,3 @@ io.on("connection", (socket) => {
 server.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });
-io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
-
-  socket.on("draw", (data) => {
-    socket.broadcast.emit("draw", data);
-  });
-
-  socket.on("add-sticky", (data) => {
-    socket.broadcast.emit("add-sticky", data);
-  });
-
-  socket.on("move-sticky", (data) => {
-    socket.broadcast.emit("move-sticky", data);
-  });
-
-  socket.on("chat-message", (msg) => {
-    socket.broadcast.emit("chat-message", msg);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("A user disconnected:", socket.id);
-  });
-});
-// Create a sticky note
-function createSticky(data) {       
-  const stickyContainer = document.getElementById("sticky-container");
-  const sticky = document.createElement("div");
-  sticky.className = "sticky";
-  sticky.style.left = data.x + "px";
-  sticky.style.top = data.y + "px";
-  sticky.textContent = data.text;
-  sticky.setAttribute("data-id", data.id);
-
-  stickyContainer.appendChild(sticky);
-
-  let offsetX, offsetY, dragging = false;
-
-  sticky.addEventListener("mousedown", (e) => {
-    dragging = true;
-    offsetX = e.clientX - sticky.offsetLeft;
-    offsetY = e.clientY - sticky.offsetTop;
-  });
-
-  document.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
-    const x = e.clientX - offsetX;
-    const y = e.clientY - offsetY;
-    sticky.style.left = x + "px";
-    sticky.style.top = y + "px";
-    socket.emit("move-sticky", {
-      id: data.id,
-      x,
-      y,
-    });
-  });
-
-  document.addEventListener("mouseup", () => dragging = false);
-}

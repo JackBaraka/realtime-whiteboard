@@ -1,121 +1,82 @@
-const canvas = document.getElementById("board");
-const ctx = canvas.getContext("2d");
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const path = require("path");
+const { v4: uuidv4 } = require("uuid");
 
-// Fullscreen canvas
-canvas.width = window.innerWidth * 0.9;
-canvas.height = window.innerHeight * 0.8;
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
-let drawing = false;
+const PORT = process.env.PORT || 3000;
 
-canvas.addEventListener("mousedown", startDrawing);
-canvas.addEventListener("mouseup", stopDrawing);
-canvas.addEventListener("mouseout", stopDrawing);
-canvas.addEventListener("mousemove", draw);
+// Serve static files (index.html, script.js, style.css, etc.)
+app.use(express.static(path.join(__dirname, ".")));
 
-function startDrawing(e) {
-  drawing = true;
-  ctx.beginPath();
-  ctx.moveTo(e.offsetX, e.offsetY);
-}
-
-function draw(e) {
-  if (!drawing) return;
-  ctx.lineTo(e.offsetX, e.offsetY);
-  ctx.strokeStyle = "#000"; // black lines
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  ctx.stroke();
-}
-
-function stopDrawing() {
-  drawing = false;
-  ctx.closePath();
-}
-const socket = io();
-const stickyContainer = document.getElementById("sticky-container");
-const addStickyBtn = document.getElementById("add-sticky");
-const chatInput = document.getElementById("chat-input");
-const chatMessages = document.getElementById("chat-messages");
-
-// Add new sticky
-addStickyBtn.addEventListener("click", () => {
-  const stickyData = {
-    id: Date.now(), // unique ID
-    x: 50,
-    y: 50,
-    text: "New note",
-  };
-  createSticky(stickyData);
-  socket.emit("add-sticky", stickyData);
+// Redirect root / to a new unique board
+app.get("/", (req, res) => {
+  res.redirect(`/board/${uuidv4()}`);
 });
 
-function createSticky(data) {
-  const sticky = document.createElement("div");
-  sticky.className = "sticky";
-  sticky.style.left = data.x + "px";
-  sticky.style.top = data.y + "px";
-  sticky.textContent = data.text;
-  sticky.setAttribute("data-id", data.id);
+// Redirect /board (with no ID) to a new unique board
+app.get("/board", (req, res) => {
+  res.redirect(`/board/${uuidv4()}`);
+});
 
-  stickyContainer.appendChild(sticky);
+// Serve index.html for /board/:sessionId
+app.get("/board/:sessionId", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
 
-  let offsetX, offsetY, dragging = false;
+// 404 handler for any other routes
+app.use((req, res) => {
+  res.status(404).sendFile(path.join(__dirname, "404.html"));
+});
 
-  sticky.addEventListener("mousedown", (e) => {
-    dragging = true;
-    offsetX = e.clientX - sticky.offsetLeft;
-    offsetY = e.clientY - sticky.offsetTop;
+// Socket.IO real-time logic
+io.on("connection", (socket) => {
+  console.log("A user connected:", socket.id);
+
+  let currentSession = null;
+
+  socket.on("join-session", (sessionId) => {
+    socket.join(sessionId);
+    currentSession = sessionId;
+    console.log(`Socket ${socket.id} joined session ${sessionId}`);
   });
 
-  document.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
-    const x = e.clientX - offsetX;
-    const y = e.clientY - offsetY;
-    sticky.style.left = x + "px";
-    sticky.style.top = y + "px";
-    socket.emit("move-sticky", {
-      id: data.id,
-      x,
-      y,
-    });
+  socket.on("draw", (data) => {
+    if (currentSession) {
+      socket.to(currentSession).emit("draw", data);
+    }
   });
 
-  document.addEventListener("mouseup", () => dragging = false);
-}
+  socket.on("add-sticky", (data) => {
+    if (currentSession) {
+      socket.to(currentSession).emit("add-sticky", data);
+    }
+  });
 
-// Receive stickies from other clients
-socket.on("add-sticky", (data) => {
-  createSticky(data);
+  socket.on("move-sticky", (data) => {
+    if (currentSession) {
+      socket.to(currentSession).emit("move-sticky", data);
+    }
+  });
+
+  socket.on("chat-message", (msg) => {
+    if (currentSession) {
+      socket.to(currentSession).emit("chat-message", msg);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("A user disconnected:", socket.id);
+  });
 });
 
-socket.on("move-sticky", (data) => {
-  const sticky = document.querySelector(`.sticky[data-id="${data.id}"]`);
-  if (sticky) {
-    sticky.style.left = data.x + "px";
-    sticky.style.top = data.y + "px";
-  }
+// Start the server
+server.listen(PORT, () => {
+  console.log(`Server listening on http://localhost:${PORT}`);
 });
-
-// Chat input
-chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && chatInput.value.trim() !== "") {
-    socket.emit("chat-message", chatInput.value.trim());
-    chatInput.value = "";
-  }
-});
-
-// Chat messages
-socket.on("chat-message", (msg) => {
-  const msgElem = document.createElement("div");
-  msgElem.textContent = msg;
-  chatMessages.appendChild(msgElem);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-});
-// Handle drawing events
-socket.on("draw", (data) => {
-  ctx.lineTo(data.x, data.y);
-  ctx.strokeStyle = "#000"; // black lines
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  ctx.stroke();
-});
+// This is the end of the file.
+// <!-- --- IGNORE --- -->

@@ -1,24 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Real-Time Whiteboard</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Real-time Collaborative Whiteboard</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>Collaborative Whiteboard - Milestone 3</h1>
+  <h1>Collaborative Whiteboard</h1>
+
   <div id="board-container">
     <canvas id="board"></canvas>
     <div id="sticky-container"></div>
   </div>
+
+  <button id="add-sticky">Add Sticky Note</button>
+
   <div id="chat">
     <div id="chat-messages"></div>
-    <input id="chat-input" placeholder="Type a message..." />
+    <input id="chat-input" placeholder="Type a message and press Enter..." />
   </div>
-  <button id="add-sticky">Add Sticky Note</button>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
+<!-- --- IGNORE --- -->
+<!-- This is the end of the file. -->
