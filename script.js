@@ -62,6 +62,17 @@ io.on("connection", (socket) => {
       socket.to(currentSession).emit("move-sticky", data);
     }
   });
+  socket.on("delete-sticky", (data) => {
+    if (currentSession) {
+      socket.to(currentSession).emit("delete-sticky", data);
+    }
+  });
+
+  socket.on("clear-board", () => {
+    if (currentSession) {
+      socket.to(currentSession).emit("clear-board");
+    }
+  });
 
   socket.on("chat-message", (msg) => {
     if (currentSession) {
